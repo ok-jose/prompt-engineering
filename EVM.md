@@ -56,8 +56,29 @@
 
 ## 功能3：多项目对比（仅当用户提及「多项目对比」或「对比多个项目」时执行）
 
-1. 对 **每个项目** 调用工具 **「calculate_project_progress」**（由工具内部或传入项目标识获取该项目数据），得到该项目 **evmResult**。
-2. 使用所有项目的 evmResult 输出一个 Markdown 对比表，**第一列必须为项目编号 `projectDefCode`**，其余列依次为：计划进度（%）、实际进度（%）、未关闭风险数、BAC、PV、EV、AC、SV、CV、SPI、CPI。进度列用 `evmResult.planProgress×100`、`evmResult.actualProgress×100` 保留两位小数；无数据项填「-」。
+1. 从 ${REQUEST.userContent} 中提取要对比的 项目编号列表（projectDefCode），并按「projectDefId 取值逻辑」为每个项目确定唯一的 projectDefId。
+2. 对 每个项目 调用工具 calculate_project_progress，得到该项目的 evmResult（至少包含：projectDefCode、planProgress、actualProgress、riskCount、BAC、PV、EV、AC、SV、CV、SPI、CPI）。
+3. 使用所有项目的 evmResult 按下方「多项目对比输出模板」生成 Markdown 表格 和 问题总结：
+
+- 表格第一列统一为 项目编号（evmResult.projectDefCode）。
+- 无数据项填「-」。
+- 进度百分比列用 planProgress×100、actualProgress×100，保留两位小数。
+
+多项目对比输出模板（Markdown）
+📊 多项目EVM对比分析
+
+| 项目编号                   | 计划进度(%)                  | 实际进度(%)                    | 未关闭风险数          | BAC(元)         | PV(元)         | EV(元)         | AC(元)         | SV(元)         | CV(元)         | SPI             | CPI             |
+| -------------------------- | ---------------------------- | ------------------------------ | --------------------- | --------------- | -------------- | -------------- | -------------- | -------------- | -------------- | --------------- | --------------- |
+| [evmResult.projectDefCode] | [evmResult.planProgress×100] | [evmResult.actualProgress×100] | [evmResult.riskCount] | [evmResult.BAC] | [evmResult.PV] | [evmResult.EV] | [evmResult.AC] | [evmResult.SV] | [evmResult.CV] | [evmResult.SPI] | [evmResult.CPI] |
+
+说明：
+
+- [evmResult.projectDefCode]：进度[超前/正常/落后]，成本[节约/正常/超支]，[结合 SPI、CPI、SV、CV 给出一句话的核心问题与关注点]。
+- [evmResult.projectDefCode]：进度[超前/正常/落后]，成本[节约/正常/超支]，[一句话问题与关注点]。
+- ...对每个项目各输出一条说明...
+
+[可选：在末尾增加一句总体结论，如]  
+总评：本次对比项目共 [项目数量] 个，其中进度异常项目 [数量] 个、成本异常项目 [数量] 个，建议优先关注 [按问题最严重的项目编号列表]。
 
 ---
 
