@@ -2,31 +2,37 @@
 
 **约定**：工具 **「calculate_project_progress」** 在内部获取预算、占用量、进度计划等数据并完成全部计算，返回 **evmResult**（含 planProgress、actualProgress、totalDuration、riskCount、projectDefCode、BAC、AC、PV、EV、SV、CV、SPI、CPI、weeklyEVMData）。所有进度与 EVM 指标、周维度数据 **必须** 来自该工具返回值，禁止自行计算或改写数值。
 
+**执行顺序（必须遵守）**：  
+先确定 **projectDefId**，再调用「calculate_project_progress」。当用户输入中带有项目编号（如「对项目H506800900008 EVM 分析」中的 H506800900008）或满足下文「触发替代逻辑」时，**必须先** 通过查询项目定义（如 `SYS_PagingDataService` / `ERP_PS$ps_project_def_md`）解析出 **projectDefId**，**再** 调用「计算项目进度」。**禁止** 先调用「计算项目进度」、发现缺少 projectDefId 失败后再去查询项目 ID。
+
 ---
 
 ## projectDefId 取值逻辑（单项目场景）
 
-执行功能1、2、4 或调用「calculate_project_progress」前，需先确定当前项目的 **projectDefId**，按以下逻辑取值。
+执行功能1、2、4 或调用「calculate_project_progress」**之前**，必须先确定当前项目的 **projectDefId**，按以下逻辑取值。
 
 ### 默认取值
 
-从 **`${REQUEST.projectId}`** 中解析得到 **projectDefId**。
+当 **`${REQUEST.projectId}`** 非空且能唯一确定项目时，从中解析得到 **projectDefId**，再调用「calculate_project_progress」。
 
 ### 触发替代逻辑（满足任一条件则执行）
 
 - 用户在 **`${REQUEST.userContent}`** 中明确提及「其他项目」
-- 用户在 **`${REQUEST.userContent}`** 中出现「项目编号 xxx」或「项目 xxx」（xxx 为具体编号）
+- 用户在 **`${REQUEST.userContent}`** 中出现「项目」「项目编号」或形如 **A~Hxxxx**（字母 + 数字串，如 H506800900008）等可解析为项目编号的内容
 - **`${REQUEST.projectId}`** 为空或无法确定唯一项目
+
+**只要触发上述任一条件，必须先查项目 ID，再计算进度**：不得先调用「计算项目进度」。
 
 ### 替代逻辑执行方式
 
-1. 从 **`${REQUEST.userContent}`** 中提取 **项目编号列表**
-2. 调用工具 **`SYS_PagingDataService`**，设置：
+1. 从 **`${REQUEST.userContent}`** 中解析 **项目编号列表**：
+   - 将「项目 xxx」「项目编号 xxx」中的 xxx、以及符合 **字母+数字串** 模式的片段（如 A001、H506800900008）均视为项目编号，全部解析出来。
+2. 使用解析得到的项目编号列表，调用 **`SYS_PagingDataService`**（或查询项目定义服务如 `ERP_PS$ps_project_def_md`），设置：
    - `conditionItems.conditions.projectDefCode.operator = IN`
    - `value = [解析得到的项目编号列表]`
-3. 从工具返回结果中提取 **`id`** 作为最终 **projectDefId**（若返回多条，按业务约定取第一条或当前选中项目对应的 id）
+3. 从工具返回结果中提取 **`id`** 作为 **projectDefId**（若返回多条，按业务约定取第一条或当前选中项目对应的 id）。
 
-确定 projectDefId 后，再调用「calculate_project_progress」或执行后续功能（调用时传入或由工具从上下文中读取该 projectDefId）。
+**在得到 projectDefId 之后**，再调用「calculate_project_progress」或执行后续功能（调用时传入或由工具从上下文中读取该 projectDefId）。
 
 ---
 
@@ -202,8 +208,6 @@
 
 ## 总结
 
-| 项             | 说明                                                                                                                                                        |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **数据与计算** | 一律通过工具 **「calculate_project_progress」** 获取并计算，工具内部获取 projectBudget、projectOccupancy、projectProgressPlanList；禁止在流程中手算或改写。 |
-| **功能顺序**   | 功能1 默认执行；功能2/3/4 按用户表述触发；功能2、3 依赖功能1 的 evmResult；功能4 需 projectDefId、wbsId（从工具返回或当前上下文获取）。                     |
-| **输出**       | 单项目按上述 Markdown 模板；多项目按对比表；生成报告时用 evmResult.weeklyEVMData 组装 reportData。                                                          |
+1. **数据与计算**：一律通过工具 **「calculate_project_progress」** 获取并计算，工具内部获取 projectBudget、projectOccupancy、projectProgressPlanList；禁止在流程中手算或改写。
+2. **功能顺序**：功能1 默认执行；功能2/3/4 按用户表述触发；功能2、3 依赖功能1 的 evmResult；功能4 需 projectDefId、wbsId（从工具返回或当前上下文获取）。
+3. **输出**：单项目按上述 Markdown 模板；多项目按对比表；生成报告时用 evmResult.weeklyEVMData 组装 reportData。
